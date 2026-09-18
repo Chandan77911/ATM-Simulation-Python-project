@@ -21,7 +21,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://atm-simulation-01.chandansahu12398.workers.dev"
+        "https://atm-simulation-01.chandansahu12398.workers.dev",
+        "http://localhost:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
