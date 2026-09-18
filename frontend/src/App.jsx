@@ -1,143 +1,583 @@
 import React, { useState } from 'react';
 import './App.css';
 
-const API_URL = "https://atm-simulation-python-project.onrender.com"; // Replace with your backend URL
+
+// ============================================================
+// Backend API URL
+// ============================================================
+
+const API_URL =
+  "https://atm-simulation-python-project.onrender.com/api";
+
 
 function App() {
-  const [screen, setScreen] = useState('login'); // login, menu, action
-  const [cardNumber, setCardNumber] = useState('4532000011112222');
-  const [pin, setPin] = useState('1234');
-  const [user, setUser] = useState(null);
-  const [message, setMessage] = useState('');
 
-  const [actionType, setActionType] = useState(''); // withdraw, deposit
-  const [amount, setAmount] = useState('');
-  const [selectedAccount, setSelectedAccount] = useState('Checking');
+  // ==========================================================
+  // State
+  // ==========================================================
+
+  const [screen, setScreen] = useState('login');
+
+  const [cardNumber, setCardNumber] =
+    useState('4532000011112222');
+
+  const [pin, setPin] =
+    useState('1234');
+
+  const [user, setUser] =
+    useState(null);
+
+  const [message, setMessage] =
+    useState('');
+
+  const [actionType, setActionType] =
+    useState('');
+
+  const [amount, setAmount] =
+    useState('');
+
+  const [selectedAccount, setSelectedAccount] =
+    useState('Checking');
+
+  const [loading, setLoading] =
+    useState(false);
+
+
+  // ==========================================================
+  // Login
+  // ==========================================================
 
   const handleLogin = async (e) => {
+
     e.preventDefault();
+
+    setMessage('');
+    setLoading(true);
+
     try {
+
       const response = await fetch(`${API_URL}/auth`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_number: cardNumber, pin })
-      });
-      const data = await response.json();
 
-      if (response.ok) {
-        setUser(data);
-        setScreen('menu');
-        setMessage('');
-      } else {
-        setMessage(data.detail);
-      }
-    } catch (error) {
-      setMessage("Connection error. Is the backend running?");
-    }
-  };
+        headers: {
+          'Content-Type': 'application/json'
+        },
 
-  const handleTransaction = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`${API_URL}/${actionType}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_number: cardNumber,
-          account_type: selectedAccount,
-          amount: parseFloat(amount)
+          pin: pin
         })
       });
+
+
       const data = await response.json();
 
+
       if (response.ok) {
-        // Update local state with new balance
-        setUser({
-          ...user,
-          accounts: {
-            ...user.accounts,
-            [selectedAccount]: data.new_balance
-          }
-        });
-        setMessage(`Success! New ${selectedAccount} balance: $${data.new_balance}`);
-        setAmount('');
+
+        setUser(data);
+
+        setScreen('menu');
+
+        setMessage('');
+
       } else {
-        setMessage(data.detail);
+
+        setMessage(
+          data.detail || 'Login failed.'
+        );
+
       }
+
     } catch (error) {
-      setMessage("Transaction failed. System error.");
+
+      console.error('Login error:', error);
+
+      setMessage(
+        'Connection error. Please check the backend.'
+      );
+
+    } finally {
+
+      setLoading(false);
+
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setPin('');
-    setScreen('login');
-    setMessage('Please take your card.');
+
+  // ==========================================================
+  // Transaction
+  // ==========================================================
+
+  const handleTransaction = async (e) => {
+
+    e.preventDefault();
+
+    setMessage('');
+
+    const numericAmount = parseFloat(amount);
+
+
+    // Validate amount on frontend
+    if (
+      isNaN(numericAmount) ||
+      numericAmount <= 0
+    ) {
+
+      setMessage(
+        'Please enter a valid amount greater than zero.'
+      );
+
+      return;
+    }
+
+
+    setLoading(true);
+
+
+    try {
+
+      const response = await fetch(
+        `${API_URL}/${actionType}`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json'
+          },
+
+          body: JSON.stringify({
+            card_number: cardNumber,
+            account_type: selectedAccount,
+            amount: numericAmount
+          })
+        }
+      );
+
+
+      const data = await response.json();
+
+
+      if (response.ok) {
+
+        // Update user's balance locally
+        setUser({
+          ...user,
+
+          accounts: {
+            ...user.accounts,
+
+            [selectedAccount]:
+              data.new_balance
+          }
+        });
+
+
+        setMessage(
+          `${data.message}! New ${selectedAccount} balance: $${Number(
+            data.new_balance
+          ).toFixed(2)}`
+        );
+
+
+        setAmount('');
+
+      } else {
+
+        setMessage(
+          data.detail || 'Transaction failed.'
+        );
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Transaction error:',
+        error
+      );
+
+      setMessage(
+        'Transaction failed. Unable to connect to the backend.'
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
   };
 
-  return (
-    <div className="atm-container">
-      <div className="atm-screen">
-        <h2>Python Global Bank</h2>
 
-        {message && <div className="alert">{message}</div>}
+  // ==========================================================
+  // Logout
+  // ==========================================================
 
-        {/* --- LOGIN SCREEN --- */}
-        {screen === 'login' && (
-          <form onSubmit={handleLogin} className="form-group">
-            <input
-              type="text"
-              placeholder="Card Number"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-            <button type="submit">Insert Card</button>
-          </form>
-        )}
+  const handleLogout = () => {
 
-        {/* --- MAIN MENU --- */}
-        {screen === 'menu' && user && (
-          <div className="menu-grid">
-            <h3>Welcome, {user.name}</h3>
-            <div className="balances">
-              <p>Checking: ${user.accounts.Checking}</p>
-              <p>Savings: ${user.accounts.Savings}</p>
+    setUser(null);
+
+    setPin('');
+
+    setAmount('');
+
+    setMessage('');
+
+    setActionType('');
+
+    setScreen('login');
+
+  };
+
+
+  // ==========================================================
+  // Back to Menu
+  // ==========================================================
+
+  const backToMenu = () => {
+
+    setActionType('');
+
+    setAmount('');
+
+    setMessage('');
+
+    setScreen('menu');
+
+  };
+
+
+  // ==========================================================
+  // LOGIN SCREEN
+  // ==========================================================
+
+  if (screen === 'login') {
+
+    return (
+
+      <div className="atm-container">
+
+        <div className="atm-machine">
+
+          <h1>
+            Python Global Bank
+          </h1>
+
+          <h2>
+            ATM
+          </h2>
+
+
+          <form onSubmit={handleLogin}>
+
+            <div className="form-group">
+
+              <label>
+                Card Number
+              </label>
+
+              <input
+                type="text"
+                value={cardNumber}
+                onChange={(e) =>
+                  setCardNumber(e.target.value)
+                }
+                placeholder="Enter card number"
+                maxLength="16"
+              />
+
             </div>
-            <button onClick={() => { setScreen('action'); setActionType('withdraw'); setMessage(''); }}>Withdraw Cash</button>
-            <button onClick={() => { setScreen('action'); setActionType('deposit'); setMessage(''); }}>Deposit Cash</button>
-            <button onClick={logout} className="cancel-btn">Return Card</button>
-          </div>
-        )}
 
-        {/* --- ACTION SCREEN (Withdraw/Deposit) --- */}
-        {screen === 'action' && (
-          <form onSubmit={handleTransaction} className="form-group">
-            <h3>{actionType.toUpperCase()}</h3>
-            <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}>
-              <option value="Checking">Checking</option>
-              <option value="Savings">Savings</option>
-            </select>
-            <input
-              type="number"
-              placeholder="Enter Amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="1"
-            />
-            <button type="submit">Confirm</button>
-            <button type="button" onClick={() => { setScreen('menu'); setMessage(''); }} className="cancel-btn">Back to Menu</button>
+
+            <div className="form-group">
+
+              <label>
+                PIN
+              </label>
+
+              <input
+                type="password"
+                value={pin}
+                onChange={(e) =>
+                  setPin(e.target.value)
+                }
+                placeholder="Enter PIN"
+                maxLength="4"
+              />
+
+            </div>
+
+
+            {message && (
+
+              <div className="message error">
+                {message}
+              </div>
+
+            )}
+
+
+            <button
+              type="submit"
+              disabled={loading}
+            >
+
+              {loading
+                ? 'Connecting...'
+                : 'Insert Card'}
+
+            </button>
+
           </form>
-        )}
+
+
+          <p className="demo-info">
+
+            Demo Card:
+            <br />
+
+            4532000011112222
+
+            <br />
+
+            PIN: 1234
+
+          </p>
+
+        </div>
+
       </div>
-    </div>
-  );
+
+    );
+  }
+
+
+  // ==========================================================
+  // MAIN MENU
+  // ==========================================================
+
+  if (screen === 'menu') {
+
+    return (
+
+      <div className="atm-container">
+
+        <div className="atm-machine">
+
+          <h1>
+            Python Global Bank
+          </h1>
+
+          <h2>
+            Welcome, {user?.name}
+          </h2>
+
+
+          <div className="accounts">
+
+            <h3>
+              Your Accounts
+            </h3>
+
+
+            {user?.accounts &&
+              Object.entries(user.accounts).map(
+                ([account, balance]) => (
+
+                  <div
+                    className="account-card"
+                    key={account}
+                  >
+
+                    <span>
+                      {account}
+                    </span>
+
+                    <strong>
+                      ${Number(balance).toFixed(2)}
+                    </strong>
+
+                  </div>
+
+                )
+              )}
+
+          </div>
+
+
+          {message && (
+
+            <div className="message success">
+              {message}
+            </div>
+
+          )}
+
+
+          <div className="menu-buttons">
+
+            <button
+              onClick={() => {
+                setActionType('withdraw');
+                setMessage('');
+                setScreen('transaction');
+              }}
+            >
+              Withdraw
+            </button>
+
+
+            <button
+              onClick={() => {
+                setActionType('deposit');
+                setMessage('');
+                setScreen('transaction');
+              }}
+            >
+              Deposit
+            </button>
+
+
+            <button
+              onClick={handleLogout}
+            >
+              Exit
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    );
+  }
+
+
+  // ==========================================================
+  // TRANSACTION SCREEN
+  // ==========================================================
+
+  if (screen === 'transaction') {
+
+    return (
+
+      <div className="atm-container">
+
+        <div className="atm-machine">
+
+          <h1>
+            Python Global Bank
+          </h1>
+
+
+          <h2>
+            {actionType === 'withdraw'
+              ? 'Withdraw Money'
+              : 'Deposit Money'}
+          </h2>
+
+
+          <form
+            onSubmit={handleTransaction}
+          >
+
+            <div className="form-group">
+
+              <label>
+                Select Account
+              </label>
+
+              <select
+                value={selectedAccount}
+                onChange={(e) =>
+                  setSelectedAccount(
+                    e.target.value
+                  )
+                }
+              >
+
+                <option value="Checking">
+                  Checking
+                </option>
+
+                <option value="Savings">
+                  Savings
+                </option>
+
+              </select>
+
+            </div>
+
+
+            <div className="form-group">
+
+              <label>
+                Amount
+              </label>
+
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) =>
+                  setAmount(e.target.value)
+                }
+                placeholder="Enter amount"
+                min="1"
+                step="0.01"
+              />
+
+            </div>
+
+
+            {message && (
+
+              <div className="message error">
+                {message}
+              </div>
+
+            )}
+
+
+            <button
+              type="submit"
+              disabled={loading}
+            >
+
+              {loading
+                ? 'Processing...'
+                : actionType === 'withdraw'
+                  ? 'Withdraw'
+                  : 'Deposit'}
+
+            </button>
+
+
+            <button
+              type="button"
+              onClick={backToMenu}
+              disabled={loading}
+            >
+              Back to Menu
+            </button>
+
+          </form>
+
+        </div>
+
+      </div>
+
+    );
+
+  }
+
+
+  // ==========================================================
+  // FALLBACK
+  // ==========================================================
+
+  return null;
 }
+
 
 export default App;
